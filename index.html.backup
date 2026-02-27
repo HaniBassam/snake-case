@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Snake React</title>
+    <style>
+      :root {
+        --bg: #0f172a;
+        --panel: #aa2a39;
+        --text: #e5e7eb;
+        --muted: #9ca3af;
+        --snake: #22c55e;
+        --food: #ef4444;
+        --grid: #8943ca;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: radial-gradient(circle at top, #1e293b 0%, var(--bg) 55%);
+        color: var(--text);
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+      }
+
+      .app {
+        width: min(92vw, 520px);
+        background: color-mix(in oklab, var(--panel) 92%, black 8%);
+        border: 1px solid #374151;
+        border-radius: 14px;
+        padding: 18px;
+        box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+      }
+
+      .row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 1.2rem;
+      }
+
+      .meta {
+        font-size: 0.95rem;
+        color: var(--muted);
+      }
+
+      .board {
+        margin-top: 14px;
+        width: 100%;
+        aspect-ratio: 1;
+        display: grid;
+        grid-template-columns: repeat(20, 1fr);
+        grid-template-rows: repeat(20, 1fr);
+        gap: 1px;
+        background: #334155;
+        border: 1px solid #475569;
+        border-radius: 8px;
+        overflow: hidden;
+      }
+
+      .cell {
+        background: var(--grid);
+      }
+
+      .cell.snake { background: var(--snake); }
+      .cell.food { background: var(--food); }
+
+      .controls {
+        margin-top: 12px;
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      button {
+        border: 1px solid #4b5563;
+        background: #111827;
+        color: var(--text);
+        padding: 8px 12px;
+        border-radius: 8px;
+        cursor: pointer;
+      }
+
+      button:hover { background: #1f2937; }
+
+      .help {
+        margin-top: 10px;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script>
+      const { useEffect, useMemo, useState, useRef } = React;
+
+      const SIZE = 20;
+      const INITIAL_SNAKE = [{ x: 10, y: 10 }];
+      const INITIAL_DIR = { x: 1, y: 0 };
+
+      function randomFood(snake) {
+        while (true) {
+          const food = {
+            x: Math.floor(Math.random() * SIZE),
+            y: Math.floor(Math.random() * SIZE),
+          };
+          if (!snake.some((s) => s.x === food.x && s.y === food.y)) return food;
+        }
+      }
+
+      function SnakeGame() {
+        const [snake, setSnake] = useState(INITIAL_SNAKE);
+        const [dir, setDir] = useState(INITIAL_DIR);
+        const [food, setFood] = useState(() => randomFood(INITIAL_SNAKE));
+        const [running, setRunning] = useState(false);
+        const [gameOver, setGameOver] = useState(false);
+        const [score, setScore] = useState(0);
+        
+        const dirQueue = useRef([]);
+        const lastProcessedDir = useRef(INITIAL_DIR);
+
+        useEffect(() => {
+          const onKey = (e) => {
+            const map = {
+              ArrowUp: { x: 0, y: -1 },
+              ArrowDown: { x: 0, y: 1 },
+              ArrowLeft: { x: -1, y: 0 },
+              ArrowRight: { x: 1, y: 0 },
+            };
+            const next = map[e.key];
+            if (!next) return;
+
+            // Check against the last queued direction, or current direction
+            const lastDir = dirQueue.current.length > 0 
+              ? dirQueue.current[dirQueue.current.length - 1] 
+              : lastProcessedDir.current;
+            
+            // Block 180-degree turns and duplicates
+            if ((lastDir.x === -next.x && lastDir.y === -next.y) ||
+                (lastDir.x === next.x && lastDir.y === next.y)) {
+              return;
+            }
+            
+            // Only keep the last queued input
+            if (dirQueue.current.length < 2) {
+              dirQueue.current.push(next);
+            }
+            
+            setRunning(true);
+          };
+
+          window.addEventListener("keydown", onKey);
+          return () => window.removeEventListener("keydown", onKey);
+        }, []);
+
+        useEffect(() => {
+          if (!running || gameOver) return;
+
+          const timer = setInterval(() => {
+            // Process next direction from queue
+            if (dirQueue.current.length > 0) {
+              const nextDir = dirQueue.current.shift();
+              lastProcessedDir.current = nextDir;
+              setDir(nextDir);
+            }
+            
+            setSnake((prev) => {
+              const head = prev[0];
+              const currentDir = lastProcessedDir.current;
+              const nextHead = { x: head.x + currentDir.x, y: head.y + currentDir.y };
+
+              const hitWall =
+                nextHead.x < 0 ||
+                nextHead.y < 0 ||
+                nextHead.x >= SIZE ||
+                nextHead.y >= SIZE;
+              const hitSelf = prev.some((s) => s.x === nextHead.x && s.y === nextHead.y);
+
+              if (hitWall || hitSelf) {
+                setGameOver(true);
+                setRunning(false);
+                return prev;
+              }
+
+              const ateFood = nextHead.x === food.x && nextHead.y === food.y;
+              const newSnake = [nextHead, ...prev];
+
+              if (ateFood) {
+                setScore((s) => s + 1);
+                setFood(randomFood(newSnake));
+                return newSnake;
+              }
+
+              newSnake.pop();
+              return newSnake;
+            });
+          }, 120);
+
+          return () => clearInterval(timer);
+        }, [running, gameOver, food]);
+
+        const board = useMemo(() => {
+          const snakeSet = new Set(snake.map((s) => `${s.x},${s.y}`));
+          const foodKey = `${food.x},${food.y}`;
+          const cells = [];
+
+          for (let y = 0; y < SIZE; y++) {
+            for (let x = 0; x < SIZE; x++) {
+              const key = `${x},${y}`;
+              let cls = "cell";
+              if (snakeSet.has(key)) cls += " snake";
+              if (key === foodKey) cls += " food";
+              cells.push(React.createElement("div", { key, className: cls }));
+            }
+          }
+
+          return cells;
+        }, [snake, food]);
+
+        const reset = () => {
+          setSnake(INITIAL_SNAKE);
+          setDir(INITIAL_DIR);
+          setFood(randomFood(INITIAL_SNAKE));
+          setRunning(false);
+          setGameOver(false);
+          setScore(0);
+          dirQueue.current = [];
+          lastProcessedDir.current = INITIAL_DIR;
+        };
+
+        return React.createElement(
+          "div",
+          { className: "app" },
+          React.createElement(
+            "div",
+            { className: "row" },
+            React.createElement("h1", null, "Snake (React)"),
+            React.createElement("div", { className: "meta" }, `Score: ${score}`)
+          ),
+          React.createElement(
+            "div",
+            { className: "meta" },
+            gameOver ? "Game over. Press Reset." : running ? "Running" : "Press an arrow key to start"
+          ),
+          React.createElement("div", { className: "board", role: "grid", "aria-label": "Snake board" }, board),
+          React.createElement(
+            "div",
+            { className: "controls" },
+            React.createElement("button", { onClick: () => setRunning(true), disabled: gameOver || running }, "Resume"),
+            React.createElement("button", { onClick: () => setRunning(false), disabled: gameOver || !running }, "Pause"),
+            React.createElement("button", { onClick: reset }, "Reset")
+          ),
+          React.createElement(
+            "div",
+            { className: "help" },
+            "Use arrow keys to move. Avoid walls and your own tail."
+          )
+        );
+      }
+
+      ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(SnakeGame));
+    </script>
+  </body>
+</html>

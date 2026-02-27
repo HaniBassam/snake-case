@@ -1,0 +1,671 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Snake Game - Professional Edition</title>
+    <style>
+      :root {
+        --bg-from: #0a0f1e;
+        --bg-to: #1a1f35;
+        --panel: #1e293b;
+        --panel-light: #2d3b52;
+        --text: #f1f5f9;
+        --text-muted: #94a3b8;
+        --snake-head: #10b981;
+        --snake-body: #059669;
+        --food: #f43f5e;
+        --food-glow: rgba(244, 63, 94, 0.4);
+        --grid: #1e293b;
+        --grid-line: #334155;
+        --accent: #3b82f6;
+        --success: #10b981;
+        --warning: #f59e0b;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(-10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          transform: scale(1);
+        }
+        50% {
+          transform: scale(1.15);
+        }
+      }
+
+      @keyframes glow {
+        0%,
+        100% {
+          box-shadow: 0 0 5px var(--food-glow);
+        }
+        50% {
+          box-shadow:
+            0 0 20px var(--food-glow),
+            0 0 30px var(--food-glow);
+        }
+      }
+
+      body {
+        margin: 0;
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          "Helvetica Neue", Arial, sans-serif;
+        background: linear-gradient(
+          135deg,
+          var(--bg-from) 0%,
+          var(--bg-to) 100%
+        );
+        color: var(--text);
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 20px;
+      }
+
+      .app {
+        width: min(95vw, 560px);
+        background: var(--panel);
+        border: 1px solid var(--grid-line);
+        border-radius: 20px;
+        padding: 24px;
+        box-shadow:
+          0 20px 60px rgba(0, 0, 0, 0.5),
+          0 0 100px rgba(59, 130, 246, 0.1);
+        animation: fadeIn 0.6s ease-out;
+      }
+
+      .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 16px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid var(--grid-line);
+      }
+
+      h1 {
+        font-size: 1.5rem;
+        font-weight: 700;
+        background: linear-gradient(
+          135deg,
+          var(--success) 0%,
+          var(--accent) 100%
+        );
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        letter-spacing: -0.5px;
+      }
+
+      .stats {
+        display: flex;
+        gap: 20px;
+        align-items: center;
+      }
+
+      .stat {
+        text-align: right;
+      }
+
+      .stat-label {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-weight: 600;
+      }
+
+      .stat-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--text);
+        line-height: 1.2;
+      }
+
+      .status {
+        text-align: center;
+        padding: 12px;
+        border-radius: 10px;
+        font-size: 0.95rem;
+        font-weight: 600;
+        margin-bottom: 16px;
+        transition: all 0.3s ease;
+      }
+
+      .status.ready {
+        background: rgba(59, 130, 246, 0.1);
+        border: 1px solid rgba(59, 130, 246, 0.3);
+        color: var(--accent);
+      }
+
+      .status.running {
+        background: rgba(16, 185, 129, 0.1);
+        border: 1px solid rgba(16, 185, 129, 0.3);
+        color: var(--success);
+      }
+
+      .status.gameover {
+        background: rgba(244, 63, 94, 0.1);
+        border: 1px solid rgba(244, 63, 94, 0.3);
+        color: var(--food);
+      }
+
+      .board-container {
+        position: relative;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.5);
+      }
+
+      .board {
+        width: 100%;
+        aspect-ratio: 1;
+        display: grid;
+        grid-template-columns: repeat(20, 1fr);
+        grid-template-rows: repeat(20, 1fr);
+        gap: 1px;
+        background: var(--grid-line);
+      }
+
+      .cell {
+        background: var(--grid);
+        transition: background 0.15s ease;
+      }
+
+      .cell.snake {
+        background: var(--snake-body);
+        box-shadow: inset 0 0 3px rgba(0, 0, 0, 0.3);
+      }
+
+      .cell.snake-head {
+        background: var(--snake-head);
+        box-shadow:
+          0 0 8px rgba(16, 185, 129, 0.4),
+          inset 0 0 3px rgba(0, 0, 0, 0.3);
+        position: relative;
+      }
+
+      .cell.food {
+        background: var(--food);
+        border-radius: 50%;
+        animation:
+          pulse 1s ease-in-out infinite,
+          glow 2s ease-in-out infinite;
+      }
+
+      .controls {
+        margin-top: 20px;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+      }
+
+      button {
+        border: 1px solid var(--grid-line);
+        background: var(--panel-light);
+        color: var(--text);
+        padding: 12px 16px;
+        border-radius: 10px;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 0.9rem;
+        transition: all 0.2s ease;
+        position: relative;
+        overflow: hidden;
+      }
+
+      button:hover:not(:disabled) {
+        background: var(--accent);
+        border-color: var(--accent);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+      }
+
+      button:active:not(:disabled) {
+        transform: translateY(0);
+      }
+
+      button:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+
+      button.primary {
+        background: var(--success);
+        border-color: var(--success);
+        color: white;
+      }
+
+      button.primary:hover:not(:disabled) {
+        background: #059669;
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+      }
+
+      .speed-control {
+        margin-top: 16px;
+        padding: 16px;
+        background: rgba(59, 130, 246, 0.05);
+        border: 1px solid var(--grid-line);
+        border-radius: 10px;
+      }
+
+      .speed-label {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+        margin-bottom: 8px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .speed-options {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+      }
+
+      .speed-btn {
+        padding: 8px;
+        font-size: 0.85rem;
+        background: var(--panel-light);
+        border: 1px solid var(--grid-line);
+      }
+
+      .speed-btn.active {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: white;
+      }
+
+      .help {
+        margin-top: 16px;
+        padding: 12px;
+        text-align: center;
+        color: var(--text-muted);
+        font-size: 0.85rem;
+        line-height: 1.6;
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 8px;
+      }
+
+      .help kbd {
+        display: inline-block;
+        padding: 2px 6px;
+        background: var(--panel-light);
+        border: 1px solid var(--grid-line);
+        border-radius: 4px;
+        font-family: monospace;
+        font-size: 0.8rem;
+        margin: 0 2px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <script
+      crossorigin
+      src="https://unpkg.com/react@18/umd/react.development.js"
+    ></script>
+    <script
+      crossorigin
+      src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"
+    ></script>
+    <script>
+      const { useEffect, useMemo, useState, useRef } = React;
+
+      const SIZE = 20;
+      const INITIAL_SNAKE = [{ x: 10, y: 10 }];
+      const INITIAL_DIR = { x: 1, y: 0 };
+      const SPEEDS = {
+        slow: { label: "Easy", interval: 150 },
+        medium: { label: "Medium", interval: 100 },
+        fast: { label: "Hard", interval: 60 },
+      };
+
+      function randomFood(snake) {
+        while (true) {
+          const food = {
+            x: Math.floor(Math.random() * SIZE),
+            y: Math.floor(Math.random() * SIZE),
+          };
+          if (!snake.some((s) => s.x === food.x && s.y === food.y)) return food;
+        }
+      }
+
+      function SnakeGame() {
+        const [snake, setSnake] = useState(INITIAL_SNAKE);
+        const [dir, setDir] = useState(INITIAL_DIR);
+        const [food, setFood] = useState(() => randomFood(INITIAL_SNAKE));
+        const [running, setRunning] = useState(false);
+        const [gameOver, setGameOver] = useState(false);
+        const [score, setScore] = useState(0);
+        const [highScore, setHighScore] = useState(() => {
+          return parseInt(localStorage.getItem("snakeHighScore") || "0");
+        });
+        const [speed, setSpeed] = useState("medium");
+
+        const dirQueue = useRef([]);
+        const lastProcessedDir = useRef(INITIAL_DIR);
+
+        useEffect(() => {
+          if (score > highScore) {
+            setHighScore(score);
+            localStorage.setItem("snakeHighScore", score.toString());
+          }
+        }, [score, highScore]);
+
+        useEffect(() => {
+          const onKey = (e) => {
+            const map = {
+              ArrowUp: { x: 0, y: -1 },
+              ArrowDown: { x: 0, y: 1 },
+              ArrowLeft: { x: -1, y: 0 },
+              ArrowRight: { x: 1, y: 0 },
+            };
+            const next = map[e.key];
+            if (!next) return;
+
+            e.preventDefault();
+
+            const lastDir =
+              dirQueue.current.length > 0
+                ? dirQueue.current[dirQueue.current.length - 1]
+                : lastProcessedDir.current;
+
+            if (
+              (lastDir.x === -next.x && lastDir.y === -next.y) ||
+              (lastDir.x === next.x && lastDir.y === next.y)
+            ) {
+              return;
+            }
+
+            if (dirQueue.current.length < 2) {
+              dirQueue.current.push(next);
+            }
+
+            if (!running && !gameOver) {
+              setRunning(true);
+            }
+          };
+
+          window.addEventListener("keydown", onKey);
+          return () => window.removeEventListener("keydown", onKey);
+        }, [running, gameOver]);
+
+        useEffect(() => {
+          if (!running || gameOver) return;
+
+          const timer = setInterval(() => {
+            if (dirQueue.current.length > 0) {
+              const nextDir = dirQueue.current.shift();
+              lastProcessedDir.current = nextDir;
+              setDir(nextDir);
+            }
+
+            setSnake((prev) => {
+              const head = prev[0];
+              const currentDir = lastProcessedDir.current;
+              const nextHead = {
+                x: head.x + currentDir.x,
+                y: head.y + currentDir.y,
+              };
+
+              const hitWall =
+                nextHead.x < 0 ||
+                nextHead.y < 0 ||
+                nextHead.x >= SIZE ||
+                nextHead.y >= SIZE;
+              const hitSelf = prev.some(
+                (s) => s.x === nextHead.x && s.y === nextHead.y,
+              );
+
+              if (hitWall || hitSelf) {
+                setGameOver(true);
+                setRunning(false);
+                return prev;
+              }
+
+              const ateFood = nextHead.x === food.x && nextHead.y === food.y;
+              const newSnake = [nextHead, ...prev];
+
+              if (ateFood) {
+                setScore((s) => s + 1);
+                setFood(randomFood(newSnake));
+                return newSnake;
+              }
+
+              newSnake.pop();
+              return newSnake;
+            });
+          }, SPEEDS[speed].interval);
+
+          return () => clearInterval(timer);
+        }, [running, gameOver, food, speed]);
+
+        const board = useMemo(() => {
+          const snakeSet = new Set(snake.map((s, i) => `${s.x},${s.y}`));
+          const headKey = `${snake[0].x},${snake[0].y}`;
+          const foodKey = `${food.x},${food.y}`;
+          const cells = [];
+
+          for (let y = 0; y < SIZE; y++) {
+            for (let x = 0; x < SIZE; x++) {
+              const key = `${x},${y}`;
+              let cls = "cell";
+              if (key === headKey) {
+                cls += " snake snake-head";
+              } else if (snakeSet.has(key)) {
+                cls += " snake";
+              }
+              if (key === foodKey) cls += " food";
+              cells.push(React.createElement("div", { key, className: cls }));
+            }
+          }
+
+          return cells;
+        }, [snake, food]);
+
+        const reset = () => {
+          setSnake(INITIAL_SNAKE);
+          setDir(INITIAL_DIR);
+          setFood(randomFood(INITIAL_SNAKE));
+          setRunning(false);
+          setGameOver(false);
+          setScore(0);
+          dirQueue.current = [];
+          lastProcessedDir.current = INITIAL_DIR;
+        };
+
+        const handleSpeedChange = (newSpeed) => {
+          setSpeed(newSpeed);
+          if (running) {
+            setRunning(false);
+          }
+        };
+
+        const resetHighScore = () => {
+          setHighScore(0);
+          localStorage.setItem("snakeHighScore", "0");
+        };
+
+        const statusText = gameOver
+          ? `Game Over! Final Score: ${score}`
+          : running
+            ? "🎮 Playing..."
+            : "Press arrow keys to start";
+
+        const statusClass = gameOver
+          ? "gameover"
+          : running
+            ? "running"
+            : "ready";
+
+        return React.createElement(
+          "div",
+          { className: "app" },
+          React.createElement(
+            "div",
+            { className: "header" },
+            React.createElement("h1", null, "🐍 Snake Game"),
+            React.createElement(
+              "div",
+              { className: "stats" },
+              React.createElement(
+                "div",
+                { className: "stat" },
+                React.createElement(
+                  "div",
+                  { className: "stat-label" },
+                  "Score",
+                ),
+                React.createElement("div", { className: "stat-value" }, score),
+              ),
+              React.createElement(
+                "div",
+                { className: "stat" },
+                React.createElement(
+                  "div",
+                  {
+                    style: {
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      justifyContent: "flex-end",
+                    },
+                  },
+                  React.createElement(
+                    "div",
+                    { className: "stat-label" },
+                    "Best",
+                  ),
+                  React.createElement(
+                    "button",
+                    {
+                      onClick: resetHighScore,
+                      style: {
+                        padding: "2px 6px",
+                        fontSize: "0.7rem",
+                        background: "rgba(239, 68, 68, 0.2)",
+                        border: "1px solid rgba(239, 68, 68, 0.3)",
+                        borderRadius: "4px",
+                        color: "#ef4444",
+                        cursor: "pointer",
+                        transition: "all 0.2s ease",
+                      },
+                      onMouseOver: (e) => {
+                        e.target.style.background = "rgba(239, 68, 68, 0.3)";
+                      },
+                      onMouseOut: (e) => {
+                        e.target.style.background = "rgba(239, 68, 68, 0.2)";
+                      },
+                      title: "Reset high score",
+                    },
+                    "✕",
+                  ),
+                ),
+                React.createElement(
+                  "div",
+                  { className: "stat-value" },
+                  highScore,
+                ),
+              ),
+            ),
+          ),
+          React.createElement(
+            "div",
+            { className: `status ${statusClass}` },
+            statusText,
+          ),
+          React.createElement(
+            "div",
+            { className: "board-container" },
+            React.createElement(
+              "div",
+              { className: "board", role: "grid", "aria-label": "Snake board" },
+              board,
+            ),
+          ),
+          React.createElement(
+            "div",
+            { className: "controls" },
+            React.createElement(
+              "button",
+              {
+                onClick: () => setRunning(true),
+                disabled: gameOver || running,
+                className: !gameOver && !running ? "primary" : "",
+              },
+              "▶ Start",
+            ),
+            React.createElement(
+              "button",
+              {
+                onClick: () => setRunning(false),
+                disabled: gameOver || !running,
+              },
+              "⏸ Pause",
+            ),
+            React.createElement("button", { onClick: reset }, "↻ Reset"),
+          ),
+          React.createElement(
+            "div",
+            { className: "speed-control" },
+            React.createElement(
+              "div",
+              { className: "speed-label" },
+              "Difficulty",
+            ),
+            React.createElement(
+              "div",
+              { className: "speed-options" },
+              Object.entries(SPEEDS).map(([key, { label }]) =>
+                React.createElement(
+                  "button",
+                  {
+                    key,
+                    className: `speed-btn ${speed === key ? "active" : ""}`,
+                    onClick: () => handleSpeedChange(key),
+                    disabled: running,
+                  },
+                  label,
+                ),
+              ),
+            ),
+          ),
+          React.createElement(
+            "div",
+            { className: "help" },
+            "Control with ",
+            React.createElement("kbd", null, "↑"),
+            React.createElement("kbd", null, "↓"),
+            React.createElement("kbd", null, "←"),
+            React.createElement("kbd", null, "→"),
+            " • Eat food to grow • Avoid walls and yourself",
+          ),
+        );
+      }
+
+      ReactDOM.createRoot(document.getElementById("root")).render(
+        React.createElement(SnakeGame),
+      );
+    </script>
+  </body>
+</html>
